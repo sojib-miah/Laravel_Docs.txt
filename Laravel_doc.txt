@@ -1,0 +1,339 @@
+//** Laravel All Importent Code Here
+
+//** Custom authentication
+
+//**web.php
+<?php
+use App\Http\Controllers\AuthController;
+use Illuminate\Support\Facades\Route;
+Route::get('/', function () {
+    // return view('welcome');
+    return redirect()->route('userLogin');
+});
+// register route 
+Route::get('/register', [AuthController::class, 'loadRegister']);
+Route::post('/register', [AuthController::class, 'userRegister'])->name('userRegister');
+// login route 
+Route::get('/login', [AuthController::class, 'loadLogin']);
+Route::post('/login', [AuthController::class, 'userLogin'])->name('userLogin');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+// admin dashboard route group with middleware
+Route::middleware('admin')->group(function () {
+    Route::get('/admin/dashboard', [AuthController::class, 'admin_dashboard'])->name('admin.dashboard');
+});
+// user dashboard route group with middleware
+Route::middleware('user')->group(function () {
+    Route::get('/dashboard', [AuthController::class, 'dashboard'])->name('dashboard');
+});
+//**End Web.php
+
+//** AuthController.php
+<?php
+namespace App\Http\Controllers;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+class AuthController extends Controller
+{
+    public function loadRegister()
+    {
+        if (Auth::user() && Auth::user()->is_admin == 1) {
+            return redirect()->route('admin.dashboard');
+        } elseif (Auth::user() && Auth::user()->is_admin == 0) {
+            return redirect()->route('dashboard');
+        }
+        return view('register');
+    } //end load register page
+    public function userRegister(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|confirmed'
+        ]);
+        User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password)
+        ]);
+        return redirect()->route('userLogin')->with('success', 'User Created SuccessFull');
+    } //end user Register
+    public function loadLogin()
+    {
+        if (Auth::user() && Auth::user()->is_admin == 1) {
+            return redirect()->route('admin.dashboard');
+        } elseif (Auth::user() && Auth::user()->is_admin == 0) {
+            return redirect()->route('dashboard');
+        }
+        return view('login');
+    } //End login Load
+    public function userLogin(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
+        ]);
+        if (Auth::attempt($credentials)) {
+            if (Auth::user()->is_admin == 1) {
+                return redirect()->route('admin.dashboard');
+            } else {
+                return redirect()->route('dashboard');
+            }
+        } else {
+            return back()->withErrors([
+                'error' => 'The provided credentials do not match our records.',
+            ]);
+        }
+    } //End login method
+    public function logout(Request $request): RedirectResponse
+    {
+        Auth::logout();
+
+        $request->session()->invalidate();
+
+        $request->session()->regenerateToken();
+
+        return redirect('/');
+    }
+    public function dashboard()
+    {
+        return view('user.dashboard');
+    } // End User Dashboard
+
+    public function admin_dashboard()
+    {
+        return view('admin.dashboard');
+    } //End Admin Dashboard
+}
+//**End AuthController.php
+
+//User And AdminMiddleware.php
+public function handle(Request $request, Closure $next): Response
+    {
+        $user = Auth::user();
+        if ($user && $user->is_admin == 0) {
+            return $next($request);
+        }
+        return redirect('/');
+    }
+
+public function handle(Request $request, Closure $next): Response
+    {
+        $user = Auth::user();
+        if ($user && $user->is_admin == 1) {
+            return $next($request);
+        }
+        return redirect('/');
+    }
+// End User And AdminMiddleware.php
+
+//bootstrap>app.php
+->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'user' => \App\Http\Middleware\UserMiddleware::class,
+        ]);
+    })
+//End bootstrap>app.php
+
+//*** CRUD Laravel Ajax with Image upload
+//**Web.php Controller link
+ Route::resource('todos', TodoController::class);
+//** TodoController.php all router link
+<?php
+namespace App\Http\Controllers;
+use App\Models\Todo;
+use Illuminate\Http\Request;
+class TodoController extends Controller
+{
+    public function index()
+    {
+        $todos = Todo::all();
+        return view('todo.todo', ['todos' => $todos]);
+    } // end index method
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required',
+            'email' => 'required|email|unique:todos',
+            'age' => 'required'
+        ]);
+        $fileName = time() . '.' . $request->image->extension();
+        $request->image->move(public_path('uploads'), $fileName);
+
+        Todo::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'age' => $request->age,
+            'image' => $fileName
+        ]);
+        return response()->json(['success' => 'Data Added SuccessFull']);
+    }
+
+    public function show() {}
+
+    public function edit($id)
+    {
+        $todo = Todo::findOrFail($id);
+        return response()->json($todo);
+    }//End edit method
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'name' => 'required',
+            'email' => 'required|email',
+            'age' => 'required|integer',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+        $todo = Todo::findOrFail($id);
+        if ($request->hasFile('image')) {
+            if ($todo->image) {
+                unlink(public_path('uploads/' . $todo->image));
+            }
+            $fileName = time() . '.' . $request->image->extension();
+            $request->image->move(public_path('uploads'), $fileName);
+            $todo->image = $fileName;
+        }
+        $todo->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'age' => $request->age,
+            'image' => $todo->image ?? null
+        ]);
+        return response()->json(['success' => 'Data updated successfully']);
+    }//End Update method
+    public function destroy($id)
+    {
+        $todo = Todo::findOrFail($id);
+
+        if ($todo->image) {
+            $filePath = public_path('uploads/' . $todo->image);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+        }
+        $todo->delete();
+        return response()->json(['success' => 'Record and image deleted successfully!']);
+    }// End Destroy Method
+}
+//*End Todo Controller.php
+//***Todo.blade.php file only script
+ @section('script')
+        <script>
+            $(document).ready(function() {
+                // Set up AJAX with CSRF token
+                $.ajaxSetup({
+                    headers: {
+                        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                    }
+                });
+                $('#addForm').submit(function(e) {
+                    e.preventDefault();
+                    let formData = new FormData(this);
+                    $.ajax({
+                        url: "{{ route('todos.store') }}",
+                        type: 'POST',
+                        data: formData,
+                        contentType: false,
+                        processData: false,
+                        success: function(response) {
+                            $('#exampleModal').modal('hide');
+                            $('.success-message').text(response.success).show();
+                            setTimeout(function() {
+                                $('.success-message').fadeOut();
+                            }, 3000);
+                            location.reload();
+                        }
+                    })
+                }) //end add data
+                // Open Edit Modal
+                $(document).on('click', '.editBtn', function() {
+                    let id = $(this).data('id');
+                    $.get(`/todos/${id}/edit`, function(todo) {
+                        $('#todoId').val(todo.id);
+                        $('#editName').val(todo.name);
+                        $('#editEmail').val(todo.email);
+                        $('#editAge').val(todo.age);
+                        $('#editModal').modal('show');
+                    });
+                });
+                // Update Data
+                $('#editForm').on('submit', function(e) {
+                    e.preventDefault();
+                    let id = $('#todoId').val();
+                    let formData = new FormData();
+                    formData.append('_method', 'PUT');
+                    formData.append('name', $('#editName').val());
+                    formData.append('email', $('#editEmail').val());
+                    formData.append('age', $('#editAge').val());
+
+                    // Handle file upload
+                    let fileInput = $('#editImage')[0];
+                    if (fileInput && fileInput.files.length > 0) {
+                        formData.append('image', fileInput.files[0]);
+                    }
+
+                    $.ajax({
+                        type: 'POST',
+                        url: `/todos/${id}`,
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(response) {
+                            alert(response.success);
+                            location.reload();
+                        },
+                        error: function(xhr) {
+                            alert('Error updating data.');
+                        }
+                    });
+                });
+                // delete btn 
+                $('.deleteBtn').on('click', function() {
+                    let itemId = $(this).data('id');
+                    if (confirm('Are you sure you want to delete this?')) {
+                        $.ajax({
+                            url: `/todos/${itemId}`,
+                            type: 'DELETE',
+                            success: function(response) {
+                                $('.success-message').text(response.success).show();
+                                setTimeout(function() {
+                                    $('.success-message').fadeOut();
+                                }, 3000);
+                                location.reload();
+                            },
+                            error: function(xhr) {
+                                alert('An error occurred. Please try again.');
+                            }
+                        });
+                    }
+                }); //end delete data
+            })
+        </script>
+    @endsection
+//**End todo.blade.php file only script
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

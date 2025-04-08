@@ -1,5 +1,10 @@
 //** Laravel All Importent Code Here
 
+//** Preview Image before upload
+<img id="blah" alt="your image" width="100" height="100" />
+<input type="file" onchange="document.getElementById('blah').src = window.URL.createObjectURL(this.files[0])">
+//** End Preview Image before upload
+
 //** Custom authentication
 
 //**web.php
@@ -190,9 +195,12 @@ class TodoController extends Controller
         ]);
         $todo = Todo::findOrFail($id);
         if ($request->hasFile('image')) {
-            if ($todo->image) {
-                unlink(public_path('uploads/' . $todo->image));
-            }
+            //if ($todo->image) {
+              //  unlink(public_path('uploads/' . $todo->image));
+            //}
+		if ($user->image && file_exists(public_path('uploads/' . $user->image))) {
+    		unlink(public_path('uploads/' . $user->image));
+		}
             $fileName = time() . '.' . $request->image->extension();
             $request->image->move(public_path('uploads'), $fileName);
             $todo->image = $fileName;

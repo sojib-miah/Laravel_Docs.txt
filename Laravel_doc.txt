@@ -340,6 +340,80 @@ class TodoController extends Controller
     @endsection
 //**End todo.blade.php file only script
 
+//**laravel custom alert message with bootstrap
+
+//html
+@if (session('success'))
+        <div class="alert alert-success alert-msg all"><i class="ti-check"></i> {{ session('success') }}</div>
+    @endif
+
+//css
+.alert-msg {
+            position: absolute;
+            width: 500px;
+            top: 20px;
+            right: 20px;
+        }
+
+//js
+setTimeout(function() {
+            $('.all').css('display', 'none');
+        }, 3000);
+
+//**End laravel custom alert message with bootstrap
+
+//**Laravel Readme.md File start here
+
+# Getting started
+
+## Installation
+
+Please check the official laravel installation guide for server requirements before you start. [Official Documentation](https://laravel.com)
+
+Clone the repository
+
+    git clone (the git url)
+
+Switch to the repo folder
+
+    cd (the project folder)
+
+Install all the dependencies using composer
+
+    composer install
+
+Copy the example env file and make the required configuration changes in the .env file
+
+    cp .env.example .env
+
+Generate a new application key
+
+    php artisan key:generate
+
+Run the database migrations (**Set the database connection in .env before migrating**)
+
+    php artisan migrate
+
+Start the local development server
+
+    php artisan serve
+
+**TL;DR command list**
+
+    git clone (the git url)
+    cd (the project folder)
+    composer install
+    cp .env.example .env
+    php artisan key:generate
+
+**Make sure you set the correct database connection information before running the migrations** [Environment variables](#environment-variables)
+
+    php artisan migrate
+    php artisan serve
+
+
+//**Laravel Readme.md File End here
+
 
 
 
